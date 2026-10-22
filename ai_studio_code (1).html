@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Qiao — 桜と猫の空間</title>
+  
+  <!-- Favicon biểu tượng mèo hoa đào -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>">
+
+  <!-- Google Fonts: Cormorant Garamond, Noto Serif JP, Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Noto+Serif+JP:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Cormorant Garamond"', '"Noto Serif JP"', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel Standalone biên dịch JSX trực tiếp -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Hiệu ứng cánh hoa anh đào rơi */
+    @keyframes fallPetal {
+      0% {
+        transform: translate(0, -30px) rotate(0deg);
+        opacity: 0;
+      }
+      20% { opacity: 0.8; }
+      80% { opacity: 0.8; }
+      100% {
+        transform: translate(60px, 105vh) rotate(360deg);
+        opacity: 0;
+      }
+    }
+    .sakura-petal {
+      position: fixed;
+      pointer-events: none;
+      z-index: 15;
+      background: linear-gradient(135deg, #fbcfe8, #f43f5e);
+      border-radius: 60% 15% 60% 15%;
+      box-shadow: 0 0 8px rgba(244, 63, 94, 0.2);
+      animation: fallPetal linear infinite;
+    }
+
+    /* Hiệu ứng trôi bồng bềnh của mèo */
+    @keyframes floatCat {
+      0%, 100% { transform: translateY(0px) rotate(-3deg); }
+      50% { transform: translateY(-16px) rotate(4deg); }
+    }
+    .floating-cat-anim {
+      animation: floatCat 5s ease-in-out infinite;
+    }
+
+    /* Hiệu ứng hạt tim & dấu chân bay lên */
+    @keyframes burstUp {
+      0% { transform: translateY(0) scale(0.6); opacity: 1; }
+      100% { transform: translateY(-50px) scale(1.8); opacity: 0; }
+    }
+    .burst-particle {
+      animation: burstUp 0.85s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-[#FFFDF9] text-stone-800 antialiased selection:bg-pink-200 selection:text-rose-950">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    /* ==========================================================================
+       1. CẤU HÌNH DỮ LIỆU CÁ NHÂN (PORTFOLIO_DATA)
+       ========================================================================== */
+    const PORTFOLIO_DATA = {
+      name: "Qiao",
+      age: 18,
+      japaneseName: "僑",
+      quote: "君とずっと一緒にいたい",
+      quoteMeaning: "Em muốn ở bên cạnh người mãi mãi...",
+      
+      // Ảnh chú mèo mắt to tròn lè lưỡi hài hước của Qiao (Ảnh 2)
+      avatar: "https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=700&q=80",
+      
+      // Ảnh khung hoa đào phong cách nghệ thuật (Ảnh 1 & 3)
+      sakuraGarden: "https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=800&q=80",
+      sakuraBranch: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=600&q=80",
+
+      socials: {
+        facebook: {
+          name: "thanh thảo",
+          url: "https://www.facebook.com/share/1FuVVwM7fq/"
+        },
+        instagram: "urs.agllpxang",
+        discord: "honggphaiemqi."
+      },
+
+      // Danh sách 19 người bạn trân quý nhất
+      special: [
+        "Cá", "Hòn", "Cat", "Meo", "Ciel", "Mochi", 
+        "Dlong", "Ghan", "Jiang", "Yu", "Selena", "Sa", 
+        "Hera", "Udon", "Pan", "Star", "Toru", "Tinh Âm", "Vile"
+      ]
+    };
+
+    /* ==========================================================================
+       2. BỘ TẠO ÂM THANH MÈO THUẦN CODE (WEB AUDIO API)
+       ========================================================================== */
+    const playMeowSound = () => {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+
+        osc.type = 'triangle';
+        // Tần số tiếng mèo: 430Hz vút lên 840Hz rồi giảm nhẹ về 450Hz
+        osc.frequency.setValueAtTime(430, now);
+        osc.frequency.exponentialRampToValueAtTime(840, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(450, now + 0.44);
+
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1180, now);
+        filter.Q.setValueAtTime(2.8, now);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.46);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.48);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    // Chuông gió Furin thanh khiết khi mở cửa
+    const playChimeSound = () => {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        [1300, 1750, 2600].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+          gain.gain.setValueAtTime(0.06, now + idx * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.07 + 1.1);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.07);
+          osc.stop(now + idx * 0.07 + 1.15);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    /* ==========================================================================
+       3. ICONS SVG THUẦN (KHÔNG CẦN CÀI ĐẶT THƯ VIỆN BÊN NGOÀI)
+       ========================================================================== */
+    const Volume2Icon = () => (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+    );
+    const VolumeXIcon = () => (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+    );
+    const MessageCircleIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
+    );
+    const ArrowUpRightIcon = () => (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>
+    );
+    const InstagramIcon = () => (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+    );
+    const CopyIcon = () => (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+    );
+    const CheckIcon = () => (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    );
+
+    /* ==========================================================================
+       4. COMPONENT CHÍNH CỦA ỨNG DỤNG
+       ========================================================================== */
+    function App() {
+      const [isDoorOpen, setIsDoorOpen] = useState(false);
+      const [showMistCat, setShowMistCat] = useState(false);
+      const [pawBursts, setPawBursts] = useState([]);
+      const [copiedDiscord, setCopiedDiscord] = useState(false);
+      const [soundActive, setSoundActive] = useState(true);
+
+      // Mở cánh cửa Nhật Bản
+      const handleOpenGate = () => {
+        if (soundActive) {
+          playChimeSound();
+          playMeowSound();
+        }
+        setIsDoorOpen(true);
+        setShowMistCat(true);
+        setTimeout(() => setShowMistCat(false), 1800);
+      };
+
+      // Tương tác bấm vào mèo hoặc bạn bè
+      const handleTriggerMeow = (e) => {
+        if (soundActive) playMeowSound();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const burstId = Date.now() + Math.random();
+        const newBurst = {
+          id: burstId,
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+        setPawBursts(prev => [...prev, newBurst]);
+        setTimeout(() => {
+          setPawBursts(prev => prev.filter(b => b.id !== burstId));
+        }, 850);
+      };
+
+      // Sao chép Discord
+      const handleCopyDiscord = () => {
+        if (soundActive) playMeowSound();
+        navigator.clipboard.writeText(PORTFOLIO_DATA.socials.discord);
+        setCopiedDiscord(true);
+        setTimeout(() => setCopiedDiscord(false), 2000);
+      };
+
+      return (
+        <div className="relative min-h-screen bg-[#FFFDF9] text-stone-800 font-serif overflow-x-hidden">
+          
+          {/* Cánh hoa đào rơi li ti */}
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div
+              key={i}
+              className="sakura-petal"
+              style={{
+                left: `${(i * 7) % 98}vw`,
+                top: `-20px`,
+                width: `${10 + (i % 6) * 2}px`,
+                height: `${14 + (i % 6) * 2.5}px`,
+                animationDuration: `${7 + (i % 5) * 1.5}s`,
+                animationDelay: `${(i % 7) * 0.9}s`
+              }}
+            />
+          ))}
+
+          {/* Hiệu ứng hạt tim hồng & dấu chân mèo bắn ra */}
+          {pawBursts.map(b => (
+            <div
+              key={b.id}
+              style={{ left: b.x - 20, top: b.y - 20 }}
+              className="burst-particle fixed pointer-events-none z-50 text-xl flex items-center gap-1 select-none"
+            >
+              <span>🐾</span>
+              <span className="text-rose-500 text-sm">💖</span>
+            </div>
+          ))}
+
+          {/* ================================================================
+              1. CỬA TRƯỢT SHOJI NHẬT BẢN MỞ ĐẦU
+              ================================================================ */}
+          {!isDoorOpen && (
+            <div className="fixed inset-0 z-50 flex overflow-hidden">
+              {/* Cánh cửa trái */}
+              <div 
+                className={`w-1/2 h-full bg-[#FAF5EE] border-r border-stone-300 relative flex items-center justify-end p-8 transition-transform duration-1000 ease-in-out ${isDoorOpen ? '-translate-x-full' : 'translate-x-0'}`}
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to right, rgba(160, 110, 80, 0.08) 1.5px, transparent 1.5px),
+                    linear-gradient(to bottom, rgba(160, 110, 80, 0.08) 1.5px, transparent 1.5px)
+                  `,
+                  backgroundSize: '40px 70px'
+                }}
+              >
+                <span className="text-pink-300/30 text-8xl font-serif select-none hidden md:block" style={{ writingMode: 'vertical-rl' }}>
+                  桜の門
+                </span>
+              </div>
+
+              {/* Cánh cửa phải */}
+              <div 
+                className={`w-1/2 h-full bg-[#FAF5EE] border-l border-stone-300 relative flex items-center justify-start p-8 transition-transform duration-1000 ease-in-out ${isDoorOpen ? 'translate-x-full' : 'translate-x-0'}`}
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to right, rgba(160, 110, 80, 0.08) 1.5px, transparent 1.5px),
+                    linear-gradient(to bottom, rgba(160, 110, 80, 0.08) 1.5px, transparent 1.5px)
+                  `,
+                  backgroundSize: '40px 70px'
+                }}
+              >
+                <span className="text-pink-300/30 text-8xl font-serif select-none hidden md:block" style={{ writingMode: 'vertical-rl' }}>
+                  僑の世界
+                </span>
+              </div>
+
+              {/* Con dấu chuông vàng trung tâm */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-10 px-4">
+                <button
+                  onClick={handleOpenGate}
+                  className="px-8 py-4 rounded-full bg-white/95 text-stone-800 shadow-xl shadow-rose-200/50 border border-pink-200 flex items-center gap-3 cursor-pointer hover:scale-105 active:scale-95 transition-all group"
+                >
+                  <span className="text-xl animate-bounce">🔔</span>
+                  <div className="text-left">
+                    <p className="text-[10px] tracking-[0.25em] uppercase text-rose-500 font-sans font-bold">CLICK TO ENTER</p>
+                    <p className="text-sm font-serif font-bold tracking-widest text-stone-800">MỞ CÁNH CỬA NHẬT BẢO</p>
+                  </div>
+                  <span className="text-lg group-hover:rotate-12 transition-transform">🐾</span>
+                </button>
+                <p className="mt-3 text-xs tracking-widest text-stone-400 font-serif">
+                  桜と猫の空間へようこそ
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Bóng mèo thần bí mờ ảo khi vừa mở cửa */}
+          {showMistCat && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none bg-rose-50/40 backdrop-blur-sm transition-opacity duration-1000">
+              <div className="flex flex-col items-center animate-pulse">
+                <div className="text-9xl filter drop-shadow-[0_0_35px_rgba(251,113,133,0.7)]">
+                  🐈
+                </div>
+                <p className="mt-4 px-6 py-1.5 rounded-full bg-white/90 text-rose-700 font-serif tracking-[0.25em] text-xs border border-pink-200 shadow-sm">
+                  ようこそ、Qiao の世界へ 🌸
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================
+              2. MÈO BAY LƠ LỬNG GÓC TRÁI (BẤM VÀO KÊU MEOW)
+              ================================================================ */}
+          <div
+            onClick={handleTriggerMeow}
+            title="Nhấn vào tớ để nghe tiếng meow nha~"
+            className="floating-cat-anim fixed bottom-8 left-6 z-30 cursor-pointer select-none group"
+          >
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full bg-white/90 border border-pink-200 shadow-lg shadow-pink-100 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform overflow-hidden p-1">
+                <img 
+                  src={PORTFOLIO_DATA.avatar} 
+                  alt="Cat" 
+                  className="w-full h-full object-cover rounded-full"
+                />
+              </div>
+              <span className="absolute -top-2 -right-1 bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full shadow font-sans font-semibold">
+                Nya~
+              </span>
+            </div>
+          </div>
+
+          {/* ================================================================
+              3. HEADER TỐI GIẢN
+              ================================================================ */}
+          <header className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between border-b border-stone-200/60 relative z-20">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full overflow-hidden border border-rose-300 shadow-sm p-0.5 bg-white">
+                <img 
+                  src={PORTFOLIO_DATA.avatar} 
+                  alt="Logo" 
+                  className="w-full h-full object-cover rounded-full"
+                />
+              </div>
+              <span className="text-xs tracking-[0.3em] font-serif font-bold uppercase text-stone-800">
+                {PORTFOLIO_DATA.name} — 桜
+              </span>
+            </div>
+
+            <div className="flex items-center gap-6 text-xs tracking-widest text-stone-500 font-sans uppercase">
+              <span className="hidden sm:inline">18 YEARS OLD</span>
+              <button
+                onClick={() => {
+                  if (!soundActive) playMeowSound();
+                  setSoundActive(!soundActive);
+                }}
+                className="p-1.5 text-stone-600 hover:text-rose-600 transition-colors cursor-pointer"
+                title="Bật/Tắt âm thanh"
+              >
+                {soundActive ? <Volume2Icon /> : <VolumeXIcon />}
+              </button>
+            </div>
+          </header>
+
+          {/* ================================================================
+              4. NỘI DUNG CHÍNH (BỐ CỤC THEO ẢNH 1 VÀ ẢNH 3)
+              ================================================================ */}
+          <main className="max-w-6xl mx-auto px-6 py-8 md:py-16 relative">
+            
+            {/* Chữ Kanji xếp dọc ở 2 bên mép (Tategaki) */}
+            <div 
+              className="absolute left-2 top-24 select-none opacity-40 font-serif text-stone-800 tracking-[0.5em] text-xs hidden lg:block" 
+              style={{ writingMode: 'vertical-rl' }}
+            >
+              東京・桜の庭・十八歳
+            </div>
+            <div 
+              className="absolute right-2 top-28 select-none opacity-40 font-serif text-stone-800 tracking-[0.5em] text-xs hidden lg:block" 
+              style={{ writingMode: 'vertical-rl' }}
+            >
+              君とずっと一緒にいたい
+            </div>
+
+            {/* PHẦN HERO EDITORIAL CHÍNH */}
+            <section className="relative min-h-[520px] md:min-h-[580px] flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 my-4">
+              
+              {/* Mặt trời hồng mờ ảo ở trung tâm (Mô phỏng Ảnh 1) */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none -z-0 flex flex-col items-center">
+                <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-full bg-gradient-to-t from-rose-400/80 via-pink-300/60 to-rose-200/20 blur-2xl opacity-60" />
+                <div className="w-56 h-28 sm:w-72 sm:h-36 rounded-t-full bg-gradient-to-b from-rose-400 to-rose-300 opacity-75 shadow-lg -mt-36 blur-[1px]" />
+              </div>
+
+              {/* Chữ Kanji 桜 chìm mờ khổ lớn (Mô phỏng Ảnh 1 & 3) */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-10 select-none text-[160px] md:text-[230px] font-serif font-black text-rose-950/[0.04] pointer-events-none -z-0">
+                桜
+              </div>
+
+              {/* CỘT TRÁI: Khung ảnh dọc hoa anh đào với Kanji đè lên (Ảnh 1) */}
+              <div className="relative z-10 w-full sm:w-64 md:w-56 shrink-0 order-2 md:order-1">
+                <div className="relative p-2 bg-white shadow-xl shadow-stone-200/60 border border-stone-200/80">
+                  <div className="h-72 sm:h-80 overflow-hidden relative">
+                    <img 
+                      src={PORTFOLIO_DATA.sakuraGarden} 
+                      alt="Sakura Garden" 
+                      className="w-full h-full object-cover grayscale-[15%] hover:grayscale-0 transition-all duration-700"
+                    />
+                    <span className="absolute top-2 left-2 text-3xl font-serif font-bold text-stone-900 bg-white/70 backdrop-blur-sm px-2 py-1 leading-none shadow-sm">
+                      桜
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[10px] tracking-[0.2em] uppercase text-stone-400 font-sans text-center">
+                    KYOTO • SAKURA SEASON
+                  </p>
+                </div>
+              </div>
+
+              {/* CỘT GIỮA: Tên, Quote tiếng Nhật & Nút liên hệ */}
+              <div className="relative z-10 text-center max-w-md mx-auto order-1 md:order-2 px-4">
+                <p className="text-xs tracking-[0.4em] uppercase text-rose-600 font-sans font-semibold mb-2">
+                  PERSONAL EDITORIAL SPACE
+                </p>
+
+                <h1 className="text-5xl sm:text-6xl md:text-7xl font-serif font-light tracking-[0.15em] text-stone-900 leading-tight">
+                  {PORTFOLIO_DATA.name.toUpperCase()}
+                </h1>
+
+                {/* Quote cá nhân của Qiao */}
+                <div className="my-6">
+                  <p className="text-xl sm:text-2xl font-serif text-stone-800 tracking-[0.2em]">
+                    {PORTFOLIO_DATA.quote}
+                  </p>
+                  <p className="text-xs italic text-stone-400 font-serif tracking-widest mt-1.5">
+                    — {PORTFOLIO_DATA.quoteMeaning}
+                  </p>
+                </div>
+
+                {/* Nút Facebook thanh thảo */}
+                <div className="mt-8 flex flex-col items-center gap-3.5">
+                  <a
+                    href={PORTFOLIO_DATA.socials.facebook.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2.5 px-7 py-3 rounded-full bg-stone-900 text-white text-xs font-sans tracking-[0.2em] uppercase hover:bg-rose-600 transition-colors shadow-lg shadow-stone-300"
+                  >
+                    <MessageCircleIcon />
+                    <span>Facebook: {PORTFOLIO_DATA.socials.facebook.name}</span>
+                    <ArrowUpRightIcon />
+                  </a>
+
+                  {/* Instagram & Discord */}
+                  <div className="flex items-center gap-6 text-xs tracking-widest font-sans text-stone-500 pt-2">
+                    <a
+                      href={`https://instagram.com/${PORTFOLIO_DATA.socials.instagram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-rose-600 transition-colors flex items-center gap-1"
+                    >
+                      <InstagramIcon />
+                      <span>@{PORTFOLIO_DATA.socials.instagram}</span>
+                    </a>
+
+                    <span className="text-stone-300">•</span>
+
+                    <button
+                      onClick={handleCopyDiscord}
+                      className="hover:text-rose-600 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Click để copy Discord"
+                    >
+                      {copiedDiscord ? <CheckIcon /> : <CopyIcon />}
+                      <span>@{PORTFOLIO_DATA.socials.discord}</span>
+                      {copiedDiscord && <span className="text-[10px] text-emerald-600 font-semibold">(Đã chép!)</span>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* CỘT PHẢI: Avatar mèo lè lưỡi hài hước & Khung cành đào (Ảnh 2 & 3) */}
+              <div className="relative z-10 w-full sm:w-64 md:w-56 shrink-0 order-3 flex flex-col items-center">
+                
+                {/* Khung ảnh đại diện chú mèo của Qiao */}
+                <div 
+                  onClick={handleTriggerMeow}
+                  className="relative cursor-pointer group mb-4 transition-transform hover:scale-105 active:scale-95"
+                  title="Nhấn vào mèo để nghe meow nha!"
+                >
+                  {/* Tai mèo nhỏ xinh xắn */}
+                  <div className="absolute -top-2.5 left-7 w-6 h-6 bg-rose-200 rounded-tl-xl rotate-[-20deg] -z-0" />
+                  <div className="absolute -top-2.5 right-7 w-6 h-6 bg-rose-200 rounded-tr-xl rotate-[20deg] -z-0" />
+                  
+                  <div className="relative w-36 h-36 rounded-full overflow-hidden border-2 border-stone-800 p-1 bg-white shadow-xl">
+                    <img 
+                      src={PORTFOLIO_DATA.avatar} 
+                      alt={PORTFOLIO_DATA.name} 
+                      className="w-full h-full object-cover rounded-full group-hover:rotate-6 transition-transform duration-300"
+                    />
+                  </div>
+                  <span className="absolute bottom-1 right-2 bg-stone-900 text-white text-[9px] px-2 py-0.5 rounded-full font-sans tracking-widest uppercase">
+                    QIAO • 18
+                  </span>
+                </div>
+
+                {/* Khung ảnh cành hoa đào (Ảnh 3) */}
+                <div className="w-full p-2 bg-white border border-stone-200/80 shadow-md">
+                  <div className="h-40 overflow-hidden">
+                    <img 
+                      src={PORTFOLIO_DATA.sakuraBranch} 
+                      alt="Cherry blossom branch" 
+                      className="w-full h-full object-cover grayscale-[10%]"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[9px] tracking-[0.25em] text-stone-400 font-sans text-center uppercase">
+                    SPRING BLOSSOM • 01/04
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* ================================================================
+                5. KHU VỰC SPECIAL — NHỮNG NGƯỜI QIAO QUÝ
+                ================================================================ */}
+            <section className="mt-20 pt-12 border-t border-stone-200/60 relative">
+              <div className="text-center mb-8">
+                <span className="text-[10px] tracking-[0.3em] uppercase text-rose-600 font-sans font-semibold">
+                  CHERISHED BONDS
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-serif text-stone-800 tracking-widest mt-1">
+                  Special People • 大切な人
+                </h2>
+                <p className="text-xs text-stone-400 font-serif italic mt-1">
+                  Nhấn vào tên một người bạn để gửi một tiếng 'Nya~' may mắn 🐾
+                </p>
+              </div>
+
+              {/* Danh sách 19 người bạn dưới dạng bùa may mắn Omamori */}
+              <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-3xl mx-auto">
+                {PORTFOLIO_DATA.special.map((friend, index) => (
+                  <button
+                    key={index}
+                    onClick={handleTriggerMeow}
+                    className="px-4 py-2 rounded-full bg-white/90 border border-stone-200 hover:border-rose-300 text-stone-700 hover:text-rose-600 text-xs tracking-wider font-serif shadow-sm transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="text-rose-400 text-[10px]">🌸</span>
+                    <span className="font-semibold">{friend}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </main>
+
+          {/* ================================================================
+              6. FOOTER
+              ================================================================ */}
+          <footer className="border-t border-stone-200/50 py-8 text-center text-xs text-stone-400 font-serif tracking-widest">
+            <p>© Qiao • {PORTFOLIO_DATA.quote} 🌸</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // Render ứng dụng vào DOM
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
